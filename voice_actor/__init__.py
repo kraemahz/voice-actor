@@ -88,13 +88,15 @@ class ParseThread(threading.Thread):
     def __init__(self,
                  recording_thread: RecordSelection,
                  command_handler: Callable,
-                 detect_wakeword: Callable[[str], bool]):
+                 detect_wakeword: Callable[[str], bool],
+                 use_result=False):
         self.record = recording_thread
         self.base = load_model_base()
         self.medium = load_model()
         self.running = False
         self.command = command_handler
         self.detect_wakeword = detect_wakeword
+        self.use_result = use_result
 
         super().__init__()
         self.daemon = True
@@ -108,7 +110,12 @@ class ParseThread(threading.Thread):
                 continue
 
             result = parse_recording(self.base, item)
-            if self.detect_wakeword(result.text):
+            if self.use_result:
+                detect = self.detect_wakeword(result)
+            else:
+                detect = self.detect_wakeword(result.text)
+
+            if detect:
                 debug("Detected wakeword: %s", result.text)
                 self.collect()
 
@@ -137,7 +144,6 @@ class ParseThread(threading.Thread):
                 debug("No further speech")
                 break
             collected.append(next)
-        self.record.stop_long()
 
         if collected:
             array = np.concatenate(collected)
@@ -145,11 +151,13 @@ class ParseThread(threading.Thread):
             debug("Send command: '%s'", result.text)
             self.command(result)
 
+        self.record.stop_long()
 
-def run_voice(commands, wakeword_detection):
+
+def run_voice(commands, wakeword_detection, use_result=False):
     """Run both threads, returning them"""
     record = RecordSelection()
-    parse = ParseThread(record, commands, wakeword_detection)
+    parse = ParseThread(record, commands, wakeword_detection, use_result)
     record.start()
     parse.start()
     return (record, parse)
