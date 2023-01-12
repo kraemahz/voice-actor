@@ -14,6 +14,7 @@ import whisper
 
 SPEECH_THRESHOLD = 0.7
 RECORD_TIMEOUT = 15
+WHISPER_MAX_TIME = 30
 
 
 def load_model_base():
@@ -42,6 +43,11 @@ class RecordSelection(threading.Thread):
 
         super().__init__()
         self.daemon = True
+
+    def __del__(self):
+        if self.running:
+            self.running = False
+            self.join()
 
     def trigger_long(self):
         with self.long_queue.mutex:
@@ -101,6 +107,11 @@ class ParseThread(threading.Thread):
         super().__init__()
         self.daemon = True
 
+    def __del__(self):
+        if self.running:
+            self.running = False
+            self.join()
+
     def run(self):
         self.running = True
         while self.running:
@@ -146,10 +157,14 @@ class ParseThread(threading.Thread):
             collected.append(next)
 
         if collected:
-            array = np.concatenate(collected)
-            result = parse_recording(self.medium, array)
-            debug("Send command: '%s'", result.text)
-            self.command(result)
+            results = []
+            stride = WHISPER_MAX_TIME // RecordSelection.window
+            chunks = [np.concatenate(collected[i : i + stride]) for i in range(0, len(collected), stride)]
+            for chunk in chunks:
+                result = parse_recording(self.medium, chunk)
+                results.append(result)
+
+            self.command(results)
 
         self.record.stop_long()
 
