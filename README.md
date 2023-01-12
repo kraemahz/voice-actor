@@ -26,5 +26,24 @@ def detect_wakeword(text):
 
 
 r, p = run_voice(commands, detect_wakeword)
+# These threads are returned so they can be joined on or cancelled
+p.join()
+```
+
+Here's a minimal example of how you might use this to use this as a speech transcriber:
+```python
+from voice_actor import run_voice
+
+class FileWriter:
+    def __init__(self, filename):
+	self.file = open(filename, 'a')
+    def write(self, whisper_result):
+        self.file.write(whisper_result.text + '\n')
+	self.file.flush()  # Writes will buffer in memory without this
+
+writer = FileWriter('example.txt')
+r, p = run_voice(writer.write,
+                 lambda x: x.no_speech_prob < 0.3,  # Custom wakeword, records if the probability of speech is >0.7
+                 True)
 p.join()
 ```
