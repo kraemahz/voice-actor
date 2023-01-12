@@ -36,10 +36,10 @@ from voice_actor import run_voice
 
 class FileWriter:
     def __init__(self, filename):
-	self.file = open(filename, 'a')
+        self.file = open(filename, 'a')
     def write(self, whisper_result):
         self.file.write(whisper_result.text + '\n')
-	self.file.flush()  # Writes will buffer in memory without this
+        self.file.flush()  # Writes will buffer in memory without this
 
 writer = FileWriter('example.txt')
 r, p = run_voice(writer.write,
